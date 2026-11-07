@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <set>
 #include "DetectionManager.h"
+#include "HIDSafeModeScan.h"
 #include "JsonUtils.h"
 #include "LogManager.h"
 #include "pci_ids.h"
@@ -105,23 +106,6 @@ const hidapi_wrapper default_hidapi_wrapper =
 /*---------------------------------------------------------*\
 | BasicHIDBlock Implementation                              |
 \*---------------------------------------------------------*/
-bool BasicHIDBlock::compare(hid_device_info* info)
-{
-    return(((vid        == HID_VID_ANY)
-         || (vid == info->vendor_id))
-        && ((pid        == HID_PID_ANY)
-         || (pid == info->product_id))
-        && ((usage_page == HID_USAGE_PAGE_ANY)
-         || (usage_page == info->usage_page))
-        && ((usage      == HID_USAGE_ANY)
-         || (usage      == info->usage))
-        && ((interface  == HID_INTERFACE_ANY)
-         || (interface  == info->interface_number))
-        && ((bus        == HID_BUS_ANY)
-         || (bus        == (int)info->bus_type))
-        );
-}
-
 bool BasicHIDBlock::matching_id(hid_device_info* info)
 {
     return(((vid == info->vendor_id))
@@ -1232,68 +1216,54 @@ void DetectionManager::BackgroundDetectHIDDevicesSafe(json& detector_settings)
     LOG_INFO("------------------------------------------------------");
 
     /*-----------------------------------------------------*\
-    | Loop through all available detectors.  If all         |
-    | required information matches, run the detector        |
+    | Same per-detector enumeration as before, except a     |
+    | detector marked disabled is not passed to             |
+    | hid_enumerate. Enabled detectors still enumerate      |
+    | their own VID/PID, then compare and run.              |
     \*-----------------------------------------------------*/
-    for(std::size_t hid_detector_idx = 0; hid_detector_idx < hid_specific_detectors.size(); hid_detector_idx++)
+    HIDSafeModeScanHooks hooks;
+
+    hooks.on_enabled_state = [](const std::string& name, bool enabled)
     {
-        HIDDeviceDetectorBlock & detector = hid_specific_detectors[hid_detector_idx];
+        LOG_DEBUG("[%s] %s is %s", DETECTIONMANAGER, name.c_str(), ((enabled == true) ? "enabled" : "disabled"));
+    };
 
+    hooks.on_before_enumerate = [](const HIDDeviceDetectorBlock& detector, unsigned short /*enumerate_vid*/, unsigned short /*enumerate_pid*/)
+    {
         LOG_VERBOSE("[%s] Trying to run detector for [%s] (for %04x:%04x)", DETECTIONMANAGER, detector.name.c_str(), detector.vid, detector.pid);
+    };
 
-        unsigned short enumerate_vid = (detector.vid == HID_VID_ANY) ? 0 : detector.vid;
-        unsigned short enumerate_pid = (detector.pid == HID_PID_ANY) ? 0 : detector.pid;
-        hid_device_info* current_hid_device = hid_enumerate(enumerate_vid, enumerate_pid);
+    hooks.prepare_match = [this](HIDDeviceDetectorBlock& detector, hid_device_info* /*current_hid_device*/)
+    {
+        detection_string = detector.name.c_str();
 
-        while(current_hid_device)
+        SignalUpdate(DETECTIONMANAGER_UPDATE_REASON_DETECTION_PROGRESS_CHANGED);
+    };
+
+    hooks.on_match = [this](HIDDeviceDetectorBlock& detector, hid_device_info* /*current_hid_device*/, DetectedControllers& detected_controllers)
+    {
+        for(std::size_t detected_controller_idx = 0; detected_controller_idx < detected_controllers.size(); detected_controller_idx++)
         {
-            if(detector.compare(current_hid_device))
-            {
-                detection_string = detector.name.c_str();
-
-                /*-----------------------------------------*\
-                | Check if this detector is enabled or      |
-                | needs to be added to the settings list    |
-                \*-----------------------------------------*/
-                bool this_device_enabled = true;
-
-                if(detector_settings.contains("detectors") && detector_settings["detectors"].contains(detection_string))
-                {
-                    this_device_enabled = detector_settings["detectors"][detection_string];
-                }
-
-                LOG_DEBUG("[%s] %s is %s", DETECTIONMANAGER, detection_string.c_str(), ((this_device_enabled == true) ? "enabled" : "disabled"));
-
-                if(this_device_enabled)
-                {
-                    SignalUpdate(DETECTIONMANAGER_UPDATE_REASON_DETECTION_PROGRESS_CHANGED);
-
-                    DetectedControllers detected_controllers = detector.function(current_hid_device, hid_specific_detectors[hid_detector_idx].name);
-
-                    for(std::size_t detected_controller_idx = 0; detected_controller_idx < detected_controllers.size(); detected_controller_idx++)
-                    {
-                        RegisterRGBController(detected_controllers[detected_controller_idx]);
-                    }
-                }
-
-                LOG_TRACE("[%s] %s detection end", DETECTIONMANAGER, detection_string.c_str());
-            }
-
-            current_hid_device = current_hid_device->next;
-
-            /*---------------------------------------------*\
-            | Update detection percent                      |
-            \*---------------------------------------------*/
-            unsigned int detection_percent_numerator = detection_percent_i2c_count
-                                                     + detection_percent_i2c_dram_count
-                                                     + detection_percent_i2c_pci_count
-                                                     + (unsigned int)hid_detector_idx;
-
-            detection_percent = (unsigned int)(100.0f * (detection_percent_numerator / detection_percent_denominator));
+            RegisterRGBController(detected_controllers[detected_controller_idx]);
         }
 
-        hid_free_enumeration(current_hid_device);
-    }
+        LOG_TRACE("[%s] %s detection end", DETECTIONMANAGER, detector.name.c_str());
+    };
+
+    hooks.on_enumerated_device = [this](std::size_t hid_detector_idx)
+    {
+        /*---------------------------------------------*\
+        | Update detection percent                      |
+        \*---------------------------------------------*/
+        unsigned int detection_percent_numerator = detection_percent_i2c_count
+                                                 + detection_percent_i2c_dram_count
+                                                 + detection_percent_i2c_pci_count
+                                                 + (unsigned int)hid_detector_idx;
+
+        detection_percent = (unsigned int)(100.0f * (detection_percent_numerator / detection_percent_denominator));
+    };
+
+    RunHIDSafeModeSpecificDetectors(hid_specific_detectors, detector_settings, hid_enumerate, hid_free_enumeration, hooks);
 }
 
 #ifdef __linux__

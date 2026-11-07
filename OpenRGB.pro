@@ -180,6 +180,7 @@ HEADERS +=                                                                      
     ResourceManagerCallback.h                                                                   \
     SettingsManager.h                                                                           \
     DetectionManager.h                                                                          \
+    HIDSafeModeScan.h                                                                           \
     dmiinfo/dmiinfo.h                                                                           \
     filesystem.h                                                                                \
     hidapi_wrapper/hidapi_wrapper.h                                                             \
@@ -241,6 +242,7 @@ SOURCES +=                                                                      
     startup/startup.cpp                                                                         \
     cli.cpp                                                                                     \
     DetectionManager.cpp                                                                        \
+    HIDSafeModeScan.cpp                                                                         \
     dmiinfo/dmiinfo.cpp                                                                         \
     JsonUtils.cpp                                                                               \
     LogManager.cpp                                                                              \
