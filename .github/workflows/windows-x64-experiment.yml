@@ -1,0 +1,46 @@
+# Separate Windows x64 build for this fork only.
+# Compiles OpenRGB and the mock HID test. Does not launch OpenRGB.exe.
+name: Windows x64 experiment
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/hid-safe-skip-disabled-e1b4
+    paths-ignore:
+      - experiment/PROVENANCE.md
+      - experiment/WINDOWS_BUILD_RESULT.md
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: windows-x64-experiment-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.repository == 'allenjacobg-hue/OpenRGB'
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Compile, test with mock HID, and package
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/ci-windows-x64-experiment.ps1
+
+      - name: Upload Windows x64 package and zip hash
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenRGB-windows-x64-hid-safe
+          path: |
+            dist/OpenRGB-windows-x64-hid-safe.zip
+            dist/OpenRGB-windows-x64-hid-safe.zip.sha256
+          if-no-files-found: error
+          retention-days: 90

@@ -85,17 +85,20 @@ The case puts disabled Corsair blocks at VID `0x1B1C` (PIDs `0x1B8B`, `0x1BE3`, 
 
 Run `sh tests/hid_safe_mode/run_test.sh` from the repository root. It was run on this Linux environment with g++ 13.3.0. That produces `/tmp/hid_safe_mode_enumeration_test`, which is a Linux ELF used only for the spy. It is not a Windows OpenRGB executable.
 
-## Windows x64 artifact
+## Windows x64 build
 
-No Windows x64 OpenRGB executable was produced. There is no SHA256 for one.
+A local Linux compile cannot produce this executable. The hosted build is `.github/workflows/windows-x64-experiment.yml` on `allenjacobg-hue/OpenRGB` only. It runs on `windows-2022` and refuses any other repository. It does not launch `OpenRGB.exe`.
 
-This environment is Linux x86_64 with g++ 13.3.0. `qmake`, Qt, MSVC, and a MinGW cross compiler are not installed. The Windows link inputs checked in tree are MSVC/PE, not a MinGW sysroot: `dependencies/hidapi-hotplug-win/x64/hidapi-hotplug.dll` is PE32+ x86-64, its import library contains a Microsoft signature, and `dependencies/libusb-1.0.27/VS2019/MS64/dll/libusb-1.0.exp` is Intel amd64 COFF. `OpenRGB.pro` adds MSVC `/utf-8` and links those import libraries plus the Qt modules the Windows script deploys. Building a Linux binary and renaming it would not make it a Windows EXE, so that was not done.
+Toolchain, all from the publishers' public archives rather than a patched OpenRGB binary:
 
-Reproducible Windows x64 build for this baseline, on a Windows machine that already has the toolchain (not run here, and not on the machine that has the installed copy unless that is a separate choice):
+- Visual Studio 2022 already installed on the GitHub `windows-2022` image. `scripts/build-windows.bat` looks for Build Tools under `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`. The hosted image provides Enterprise (or another full product) instead, so the workflow calls that image's `vcvarsall.bat x64` and then the same `qmake`, `jom`, and `windeployqt` steps as the batch script.
+- Qt 6.8.3 `win64_msvc2022_64` plus the `qt5compat` module, downloaded by pinned `aqtinstall==3.3.0` from `https://download.qt.io`. `qmake -v` must report 6.8.3 or the job fails.
+- jom 1.1.7 from `https://download.qt.io/official_releases/jom/jom_1_1_7.zip`.
 
-1. Visual Studio 2022 Build Tools, x64.
-2. Qt 6.8.3 for MSVC 2022 64-bit at `C:\Qt\6.8.3\msvc2022_64`.
-3. jom at `C:\Qt\jom`.
-4. From the repository root: `scripts\build-windows.bat 6.8.3 2022 64`.
+`windeployqt` uses the same flags as `scripts/build-windows.bat`, including `--no-compiler-runtime`. The package then copies the MSVC x64 CRT DLLs from that Visual Studio installation's redistributable directory so the EXE does not depend on a separate runtime installer. No driver installer is added. `PawnIOLib.dll` and the `.bin` modules are only the files `OpenRGB.pro` already copies into the official Windows build output. They are not installed or loaded by this job.
 
-The script runs `qmake OpenRGB.pro CONFIG-=debug_and_release CONFIG+=release`, then `jom`, then `windeployqt`, and renames `release` to `OpenRGB Windows 64-bit`. The downstream GitLab job for this file clones `https://gitlab.com/OpenRGBDevelopers/OpenRGB-Qt-Packages` and runs `install-chocolatey.bat` before that script. That job was not started. No issue, comment, or pull request was opened against the OpenRGB upstream project.
+The job also compiles and runs `hid_safe_mode_enumeration_test.exe`. That test uses the mock enumerator. It is not `OpenRGB.exe`.
+
+The zip and its SHA256 are uploaded as the Actions artifact `OpenRGB-windows-x64-hid-safe`. The result, including the real hash and download URL, is recorded in `experiment/WINDOWS_BUILD_RESULT.md` after the run. A commit that only changes that file or this provenance file does not start another build.
+
+No issue, comment, or pull request was opened against the OpenRGB upstream project.
