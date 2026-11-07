@@ -99,6 +99,13 @@ Toolchain, all from the publishers' public archives rather than a patched OpenRG
 
 The job also compiles and runs `hid_safe_mode_enumeration_test.exe`. That test uses the mock enumerator. It is not `OpenRGB.exe`.
 
-The zip and its SHA256 are uploaded as the Actions artifact `OpenRGB-windows-x64-hid-safe`. The result, including the real hash and download URL, is recorded in `experiment/WINDOWS_BUILD_RESULT.md` after the run. A commit that only changes that file or this provenance file does not start another build.
+The zip and its SHA256 are the Actions artifact `OpenRGB-windows-x64-hid-safe` from run 42388986602, commit `820a70a75254e4e660d0aa747ad26880c23e624d`. Download: https://github.com/allenjacobg-hue/OpenRGB/actions/runs/42388986602/artifacts/13581370496
+
+```
+3552fd1a78a34f3e3aa8729f9fb4564837a539d08b56675a8bc126aa5e40b2a1  OpenRGB-windows-x64-hid-safe.zip
+a1ccaf6c889b96f1ad567cde0b81f66860fb100bad38b3efff133aa0bf92eed0  OpenRGB Windows 64-bit/OpenRGB.exe
+```
+
+The downloaded `OpenRGB.exe` is PE32+ machine `0x8664`. The mock HID test in that run passed. The executable was not started. Details are in `experiment/WINDOWS_BUILD_RESULT.md`. A commit that only changes that file or this provenance file does not start another build.
 
 No issue, comment, or pull request was opened against the OpenRGB upstream project.
