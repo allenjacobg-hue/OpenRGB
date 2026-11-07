@@ -74,7 +74,22 @@ public:
     int                                 bus;
     bool                                enabled_by_default;
 
-    bool compare(hid_device_info* info);
+    bool compare(hid_device_info* info)
+    {
+        return(((vid        == HID_VID_ANY)
+             || (vid == info->vendor_id))
+            && ((pid        == HID_PID_ANY)
+             || (pid == info->product_id))
+            && ((usage_page == HID_USAGE_PAGE_ANY)
+             || (usage_page == info->usage_page))
+            && ((usage      == HID_USAGE_ANY)
+             || (usage      == info->usage))
+            && ((interface  == HID_INTERFACE_ANY)
+             || (interface  == info->interface_number))
+            && ((bus        == HID_BUS_ANY)
+             || (bus        == (int)info->bus_type))
+            );
+    }
     bool matching_id(hid_device_info* info);
 };
 
