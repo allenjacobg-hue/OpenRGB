@@ -4,6 +4,7 @@
 # Does not launch OpenRGB.exe and refuses to run outside this fork's Actions job.
 
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 
 if ($env:GITHUB_ACTIONS -ne "true") {
     throw "This script runs only inside GitHub Actions. It does not build on a local PC."
@@ -101,14 +102,14 @@ if (-not (Test-Path "C:\Qt\jom\jom.exe")) {
 Import-VcVars
 $env:PATH = "C:\Qt\6.8.3\msvc2022_64\bin;C:\Qt\jom;" + $env:PATH
 
-$QtVersion = & $Qmake -v
+$QtVersion = (& $Qmake -v 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) { throw "qmake -v failed" }
 Write-Host $QtVersion
-if ($QtVersion -notmatch "6\.8\.3") {
-    throw "qmake is not Qt 6.8.3"
+if ($QtVersion -notmatch "Qt version 6\.8\.3") {
+    throw "qmake is not Qt 6.8.3. Output was: $QtVersion"
 }
 
-$ClVersion = & cl 2>&1 | Select-Object -First 1
+$ClVersion = (& cl 2>&1 | Out-String).Trim().Split("`n")[0].Trim()
 Write-Host $ClVersion
 
 Write-Host "Compiling the mock HID enumeration test"
